@@ -1,15 +1,19 @@
 package com.survey.service;
 
 import com.survey.dto.PagedResponse;
+import com.survey.dto.SurveyDetailsResponseDTO;
 import com.survey.dto.SurveyRequestDTO;
 import com.survey.dto.SurveyResponseDTO;
+import com.survey.entity.Option;
+import com.survey.entity.Question;
 import com.survey.entity.Survey;
 import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
+import com.survey.repository.OptionRepository;
+import com.survey.repository.QuestionRepository;
 import com.survey.repository.SurveyRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Metrics;
 import net.logstash.logback.argument.StructuredArguments;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +24,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,17 +37,20 @@ public class SurveyService {
     private static final Logger LOGGER = LoggerFactory.getLogger(SurveyService.class);
 
     private final SurveyRepository surveyRepository;
+    private final QuestionRepository questionRepository;
+    private final OptionRepository optionRepository;
     private final Counter surveyCreatedCounter;
     private final Counter surveyUpdatedCounter;
     private final Counter surveyDeletedCounter;
 
-    public SurveyService(SurveyRepository surveyRepository) {
-        this(surveyRepository, Metrics.globalRegistry);
-    }
-
     @Autowired
-    public SurveyService(SurveyRepository surveyRepository, MeterRegistry meterRegistry) {
+    public SurveyService(SurveyRepository surveyRepository,
+                         QuestionRepository questionRepository,
+                         OptionRepository optionRepository,
+                         MeterRegistry meterRegistry) {
         this.surveyRepository = surveyRepository;
+        this.questionRepository = questionRepository;
+        this.optionRepository = optionRepository;
         this.surveyCreatedCounter = meterRegistry.counter("survey.operations", "type", "create");
         this.surveyUpdatedCounter = meterRegistry.counter("survey.operations", "type", "update");
         this.surveyDeletedCounter = meterRegistry.counter("survey.operations", "type", "delete");
@@ -60,6 +70,50 @@ public class SurveyService {
         Survey survey = surveyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pesquisa não encontrada com id: " + id));
         return convertToDTO(survey);
+    }
+
+    public SurveyDetailsResponseDTO getSurveyStructure(Long id, boolean includeInactiveOptions) {
+        Survey survey = surveyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pesquisa não encontrada com id: " + id));
+
+        List<Question> questions = questionRepository.findBySurveyIdOrderByOrdemAsc(id);
+        List<Long> questionIds = questions.stream()
+                .map(Question::getId)
+                .toList();
+
+        Map<Long, List<Option>> optionsGrouped = questionIds.isEmpty()
+                ? Collections.emptyMap()
+                : (includeInactiveOptions
+                    ? optionRepository.findByQuestionIdIn(questionIds)
+                    : optionRepository.findByQuestionIdInAndAtivoTrue(questionIds))
+                .stream()
+                .collect(Collectors.groupingBy(option -> option.getQuestion().getId()));
+
+        List<SurveyDetailsResponseDTO.QuestionDetails> questionDetails = questions.stream()
+                .map(question -> new SurveyDetailsResponseDTO.QuestionDetails(
+                        question.getId(),
+                        question.getTexto(),
+                        question.getOrdem(),
+                        optionsGrouped.getOrDefault(question.getId(), Collections.emptyList()).stream()
+                                .sorted(Comparator.comparing(Option::getId))
+                                .map(option -> new SurveyDetailsResponseDTO.OptionDetails(
+                                        option.getId(),
+                                        option.getTexto(),
+                                        option.getAtivo()
+                                ))
+                                .collect(Collectors.toList())
+                ))
+                .collect(Collectors.toList());
+
+        return new SurveyDetailsResponseDTO(
+                survey.getId(),
+                survey.getTitulo(),
+                survey.getAtivo(),
+                survey.getDataValidade(),
+                survey.getCreatedAt(),
+                survey.getUpdatedAt(),
+                questionDetails
+        );
     }
 
     public SurveyResponseDTO create(SurveyRequestDTO requestDTO) {

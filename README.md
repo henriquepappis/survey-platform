@@ -50,6 +50,14 @@ java -jar target/survey-api-1.0.0.jar
 
 A API estará disponível em: `http://localhost:8080`
 
+### 4. Frontend local (CORS)
+
+O arquivo `application.properties` expõe a propriedade `app.cors.allowed-origins`. Por padrão ela já libera `http://localhost:3000` (Create React App) e `http://localhost:5173` (Vite). Ajuste a lista separada por vírgulas caso use outra porta ou hostname.
+
+### 5. Dados de exemplo para desenvolvimento
+
+Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popula automaticamente uma pesquisa de exemplo com perguntas e opções. Defina o valor como `false` se não quiser carregar dados de demonstração ao subir a API.
+
 ## Endpoints
 
 ### Health Check
@@ -65,6 +73,32 @@ A API estará disponível em: `http://localhost:8080`
 #### Buscar pesquisa por ID
 - **GET** `/api/surveys/{id}`
   - Resposta: Dados da pesquisa
+
+#### Buscar estrutura completa da pesquisa (perguntas + opções)
+- **GET** `/api/surveys/{id}/structure`
+  - Query params (opcional): `includeInactiveOptions=false` - define se opções inativas também devem ser retornadas
+  - Resposta:
+    ```json
+    {
+      "id": 1,
+      "titulo": "Pesquisa de Satisfação",
+      "ativo": true,
+      "questions": [
+        {
+          "id": 10,
+          "texto": "Qual sua idade?",
+          "ordem": 1,
+          "options": [
+            {
+              "id": 100,
+              "texto": "Entre 18 e 25 anos",
+              "ativo": true
+            }
+          ]
+        }
+      ]
+    }
+    ```
 
 #### Criar nova pesquisa
 - **POST** `/api/surveys`
@@ -556,4 +590,3 @@ curl -X PUT http://localhost:8080/api/options/1 \
 ```bash
 curl -X DELETE http://localhost:8080/api/options/1
 ```
-

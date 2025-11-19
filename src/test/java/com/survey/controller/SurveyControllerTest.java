@@ -2,9 +2,11 @@ package com.survey.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.survey.dto.PagedResponse;
+import com.survey.dto.SurveyDetailsResponseDTO;
 import com.survey.dto.SurveyRequestDTO;
 import com.survey.dto.SurveyResponseDTO;
 import com.survey.service.SurveyService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -125,6 +127,35 @@ class SurveyControllerTest {
 
         assertTrue(surveyService.wasFindAllAtivasCalled());
         assertFalse(surveyService.wasFindAllCalled());
+    }
+
+    @Test
+    @DisplayName("GET /api/surveys/{id}/structure deve retornar árvore completa da pesquisa")
+    void getSurveyStructure_shouldReturnTree() throws Exception {
+        SurveyDetailsResponseDTO.OptionDetails option =
+                new SurveyDetailsResponseDTO.OptionDetails(50L, "Sim", true);
+        SurveyDetailsResponseDTO.QuestionDetails question =
+                new SurveyDetailsResponseDTO.QuestionDetails(10L, "Você recomenda?", 1, List.of(option));
+        SurveyDetailsResponseDTO structure = new SurveyDetailsResponseDTO(
+                1L,
+                "Pesquisa NPS",
+                true,
+                LocalDateTime.now().plusDays(30),
+                LocalDateTime.now().minusDays(1),
+                LocalDateTime.now(),
+                List.of(question));
+        surveyService.setStructureResult(structure);
+
+        mockMvc.perform(get("/api/surveys/1/structure")
+                .param("includeInactiveOptions", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.questions", hasSize(1)))
+                .andExpect(jsonPath("$.questions[0].options", hasSize(1)))
+                .andExpect(jsonPath("$.questions[0].options[0].texto", is("Sim")));
+
+        assertEquals(1L, surveyService.getLastStructureSurveyId());
+        assertTrue(surveyService.wasStructureCalledWithInactive());
     }
 
     @Test
@@ -275,8 +306,12 @@ class SurveyControllerTest {
         private boolean deleteCalled;
         private Long lastDeleteId;
 
+        private SurveyDetailsResponseDTO structureResult;
+        private Long lastStructureSurveyId;
+        private boolean lastStructureIncludeInactive;
+
         TestSurveyService() {
-            super(null);
+            super(null, null, null, new SimpleMeterRegistry());
         }
 
         void setFindAllResult(List<SurveyResponseDTO> result) {
@@ -301,6 +336,10 @@ class SurveyControllerTest {
 
         void setUpdateResult(SurveyResponseDTO result) {
             this.updateResult = result;
+        }
+
+        void setStructureResult(SurveyDetailsResponseDTO structureResult) {
+            this.structureResult = structureResult;
         }
 
         boolean wasFindAllCalled() {
@@ -333,6 +372,14 @@ class SurveyControllerTest {
 
         SurveyRequestDTO getLastUpdateRequest() {
             return lastUpdateRequest;
+        }
+
+        Long getLastStructureSurveyId() {
+            return lastStructureSurveyId;
+        }
+
+        boolean wasStructureCalledWithInactive() {
+            return lastStructureIncludeInactive;
         }
 
         boolean wasDeleteCalled() {
@@ -385,6 +432,13 @@ class SurveyControllerTest {
         public void delete(Long id) {
             deleteCalled = true;
             lastDeleteId = id;
+        }
+
+        @Override
+        public SurveyDetailsResponseDTO getSurveyStructure(Long id, boolean includeInactiveOptions) {
+            lastStructureSurveyId = id;
+            lastStructureIncludeInactive = includeInactiveOptions;
+            return structureResult;
         }
 
         private PagedResponse<SurveyResponseDTO> toPaged(List<SurveyResponseDTO> content, Pageable pageable) {

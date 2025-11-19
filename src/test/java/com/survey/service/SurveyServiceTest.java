@@ -1,11 +1,16 @@
 package com.survey.service;
 
 import com.survey.dto.PagedResponse;
+import com.survey.dto.SurveyDetailsResponseDTO;
 import com.survey.dto.SurveyRequestDTO;
 import com.survey.dto.SurveyResponseDTO;
+import com.survey.entity.Option;
+import com.survey.entity.Question;
 import com.survey.entity.Survey;
 import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
+import com.survey.repository.OptionRepository;
+import com.survey.repository.QuestionRepository;
 import com.survey.repository.SurveyRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,11 +39,21 @@ class SurveyServiceTest {
     @Mock
     private SurveyRepository surveyRepository;
 
+    @Mock
+    private QuestionRepository questionRepository;
+
+    @Mock
+    private OptionRepository optionRepository;
+
     private SurveyService surveyService;
 
     @BeforeEach
     void setUp() {
-        surveyService = new SurveyService(surveyRepository, new SimpleMeterRegistry());
+        surveyService = new SurveyService(
+                surveyRepository,
+                questionRepository,
+                optionRepository,
+                new SimpleMeterRegistry());
     }
 
     @Test
@@ -122,6 +137,35 @@ class SurveyServiceTest {
         when(surveyRepository.existsById(7L)).thenReturn(false);
 
         assertThrows(ResourceNotFoundException.class, () -> surveyService.delete(7L));
+    }
+
+    @Test
+    @DisplayName("getSurveyStructure deve montar perguntas e opções filtrando ativas por padrão")
+    void getSurveyStructure_shouldAssembleTree() {
+        Survey survey = buildSurvey(1L, "Pesquisa", true);
+        Question question = new Question();
+        question.setId(10L);
+        question.setTexto("Pergunta 1");
+        question.setOrdem(1);
+        question.setSurvey(survey);
+        Option option = new Option();
+        option.setId(100L);
+        option.setTexto("Sim");
+        option.setAtivo(true);
+        option.setQuestion(question);
+
+        when(surveyRepository.findById(1L)).thenReturn(Optional.of(survey));
+        when(questionRepository.findBySurveyIdOrderByOrdemAsc(1L))
+                .thenReturn(List.of(question));
+        when(optionRepository.findByQuestionIdInAndAtivoTrue(List.of(10L)))
+                .thenReturn(List.of(option));
+
+        SurveyDetailsResponseDTO response = surveyService.getSurveyStructure(1L, false);
+
+        assertThat(response.getQuestions()).hasSize(1);
+        assertThat(response.getQuestions().get(0).getOptions()).hasSize(1);
+        verify(optionRepository).findByQuestionIdInAndAtivoTrue(List.of(10L));
+        verify(optionRepository, never()).findByQuestionIdIn(anyList());
     }
 
     private Survey buildSurvey(Long id, String titulo, boolean ativo) {

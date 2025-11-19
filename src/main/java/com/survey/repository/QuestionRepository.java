@@ -14,6 +14,8 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
 
     Page<Question> findBySurveyId(Long surveyId, Pageable pageable);
 
+    List<Question> findBySurveyIdOrderByOrdemAsc(Long surveyId);
+
     Optional<Question> findByIdAndSurveyId(Long id, Long surveyId);
 
     boolean existsBySurveyIdAndOrdem(Long surveyId, Integer ordem);

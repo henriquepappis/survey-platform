@@ -16,6 +16,10 @@ public interface OptionRepository extends JpaRepository<Option, Long> {
 
     Page<Option> findByQuestionId(Long questionId, Pageable pageable);
 
+    List<Option> findByQuestionIdIn(List<Long> questionIds);
+
+    List<Option> findByQuestionIdInAndAtivoTrue(List<Long> questionIds);
+
     List<Option> findByQuestionIdAndAtivoTrue(Long questionId);
 
     Page<Option> findByQuestionIdAndAtivoTrue(Long questionId, Pageable pageable);

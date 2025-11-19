@@ -1,6 +1,7 @@
 package com.survey.controller;
 
 import com.survey.dto.PagedResponse;
+import com.survey.dto.SurveyDetailsResponseDTO;
 import com.survey.dto.SurveyRequestDTO;
 import com.survey.dto.SurveyResponseDTO;
 import com.survey.service.SurveyService;
@@ -47,6 +48,13 @@ public class SurveyController {
     public ResponseEntity<SurveyResponseDTO> getSurveyById(@PathVariable Long id) {
         SurveyResponseDTO survey = surveyService.findById(id);
         return ResponseEntity.ok(survey);
+    }
+
+    @GetMapping("/{id}/structure")
+    public ResponseEntity<SurveyDetailsResponseDTO> getSurveyStructure(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean includeInactiveOptions) {
+        return ResponseEntity.ok(surveyService.getSurveyStructure(id, includeInactiveOptions));
     }
 
     @PostMapping
