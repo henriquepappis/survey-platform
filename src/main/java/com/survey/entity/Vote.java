@@ -32,6 +32,10 @@ public class Vote {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "response_session_id")
+    private ResponseSession responseSession;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -83,5 +87,13 @@ public class Vote {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public ResponseSession getResponseSession() {
+        return responseSession;
+    }
+
+    public void setResponseSession(ResponseSession responseSession) {
+        this.responseSession = responseSession;
     }
 }

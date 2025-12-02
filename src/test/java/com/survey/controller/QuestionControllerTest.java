@@ -5,6 +5,7 @@ import com.survey.dto.PagedResponse;
 import com.survey.dto.QuestionRequestDTO;
 import com.survey.dto.QuestionResponseDTO;
 import com.survey.service.QuestionService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -213,7 +214,7 @@ class QuestionControllerTest {
         private Long lastDeleteId;
 
         TestQuestionService() {
-            super(null, null);
+            super(null, null, null, new SimpleMeterRegistry());
         }
 
         void setFindAllResult(List<QuestionResponseDTO> result) {

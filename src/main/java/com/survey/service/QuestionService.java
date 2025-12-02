@@ -8,6 +8,7 @@ import com.survey.entity.Survey;
 import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.QuestionRepository;
+import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -33,20 +34,25 @@ public class QuestionService {
 
     private final QuestionRepository questionRepository;
     private final SurveyRepository surveyRepository;
+    private final ResponseSessionRepository responseSessionRepository;
     private final Counter questionCreatedCounter;
     private final Counter questionUpdatedCounter;
     private final Counter questionDeletedCounter;
 
-    public QuestionService(QuestionRepository questionRepository, SurveyRepository surveyRepository) {
-        this(questionRepository, surveyRepository, Metrics.globalRegistry);
+    public QuestionService(QuestionRepository questionRepository,
+                           SurveyRepository surveyRepository,
+                           ResponseSessionRepository responseSessionRepository) {
+        this(questionRepository, surveyRepository, responseSessionRepository, Metrics.globalRegistry);
     }
 
     @Autowired
     public QuestionService(QuestionRepository questionRepository,
                            SurveyRepository surveyRepository,
+                           ResponseSessionRepository responseSessionRepository,
                            MeterRegistry meterRegistry) {
         this.questionRepository = questionRepository;
         this.surveyRepository = surveyRepository;
+        this.responseSessionRepository = responseSessionRepository;
         this.questionCreatedCounter = meterRegistry.counter("question.operations", "type", "create");
         this.questionUpdatedCounter = meterRegistry.counter("question.operations", "type", "update");
         this.questionDeletedCounter = meterRegistry.counter("question.operations", "type", "delete");
@@ -166,6 +172,7 @@ public class QuestionService {
         if (!questionRepository.existsById(id)) {
             throw new ResourceNotFoundException("Pergunta não encontrada com id: " + id);
         }
+        responseSessionRepository.deleteByQuestionId(id);
         questionRepository.deleteById(id);
         questionDeletedCounter.increment();
         LOGGER.info("Question deleted {}", StructuredArguments.kv("questionId", id));

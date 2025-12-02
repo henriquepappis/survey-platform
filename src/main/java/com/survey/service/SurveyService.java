@@ -11,7 +11,9 @@ import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.OptionRepository;
 import com.survey.repository.QuestionRepository;
+import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
+import com.survey.repository.VoteRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import net.logstash.logback.argument.StructuredArguments;
@@ -39,6 +41,8 @@ public class SurveyService {
     private final SurveyRepository surveyRepository;
     private final QuestionRepository questionRepository;
     private final OptionRepository optionRepository;
+    private final VoteRepository voteRepository;
+    private final ResponseSessionRepository responseSessionRepository;
     private final Counter surveyCreatedCounter;
     private final Counter surveyUpdatedCounter;
     private final Counter surveyDeletedCounter;
@@ -47,10 +51,14 @@ public class SurveyService {
     public SurveyService(SurveyRepository surveyRepository,
                          QuestionRepository questionRepository,
                          OptionRepository optionRepository,
+                         VoteRepository voteRepository,
+                         ResponseSessionRepository responseSessionRepository,
                          MeterRegistry meterRegistry) {
         this.surveyRepository = surveyRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
+        this.voteRepository = voteRepository;
+        this.responseSessionRepository = responseSessionRepository;
         this.surveyCreatedCounter = meterRegistry.counter("survey.operations", "type", "create");
         this.surveyUpdatedCounter = meterRegistry.counter("survey.operations", "type", "update");
         this.surveyDeletedCounter = meterRegistry.counter("survey.operations", "type", "delete");
@@ -188,6 +196,19 @@ public class SurveyService {
         if (!surveyRepository.existsById(id)) {
             throw new ResourceNotFoundException("Pesquisa não encontrada com id: " + id);
         }
+
+        responseSessionRepository.deleteBySurveyId(id);
+        voteRepository.deleteBySurveyId(id);
+
+        List<Long> questionIds = questionRepository.findBySurveyIdOrderByOrdemAsc(id).stream()
+                .map(Question::getId)
+                .toList();
+
+        if (!questionIds.isEmpty()) {
+            optionRepository.deleteByQuestionIdIn(questionIds);
+        }
+
+        questionRepository.deleteBySurveyId(id);
         surveyRepository.deleteById(id);
         surveyDeletedCounter.increment();
         LOGGER.info("Survey deleted {}", StructuredArguments.kv("surveyId", id));

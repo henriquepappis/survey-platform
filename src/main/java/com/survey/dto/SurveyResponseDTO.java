@@ -16,7 +16,7 @@ public class SurveyResponseDTO {
     }
 
     public SurveyResponseDTO(Long id, String titulo, Boolean ativo, LocalDateTime dataValidade,
-                            LocalDateTime createdAt, LocalDateTime updatedAt) {
+                             LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.titulo = titulo;
         this.ativo = ativo;
@@ -74,4 +74,3 @@ public class SurveyResponseDTO {
         this.updatedAt = updatedAt;
     }
 }
-

@@ -58,6 +58,97 @@ O arquivo `application.properties` expõe a propriedade `app.cors.allowed-origin
 
 Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popula automaticamente uma pesquisa de exemplo com perguntas e opções. Defina o valor como `false` se não quiser carregar dados de demonstração ao subir a API.
 
+### 6. Autenticação (Backoffice)
+
+- A API expõe autenticação JWT para o painel administrativo.
+- Endpoint de login: `POST /api/auth/login` com body:
+  ```json
+  {
+    "username": "admin",
+    "password": "admin"
+  }
+  ```
+- Em ambiente local é criado automaticamente o usuário `admin/admin`. Altere as credenciais após o primeiro acesso.
+- Após o login, utilize o token retornado no header `Authorization: Bearer <token>` para acessar rotas protegidas (CRUD de pesquisas, perguntas, opções e relatórios internos).
+- Endpoints públicos (sem token): `GET /api/surveys/**`, `GET /api/questions/**`, `GET /api/options/**`, `POST /api/votes`, `GET /api/health`, documentação Swagger e Actuator.
+
+### 7. Variáveis de ambiente (.env)
+
+- Os valores sensíveis (banco de dados, JWT, CORS) são lidos de variáveis de ambiente, com defaults definidos em `application.properties`.
+- Copie o arquivo `.env.example` para `.env` e ajuste os valores.
+- Antes de rodar a aplicação localmente, execute `source .env` (ou configure seu IDE para carregar o arquivo automaticamente). Exemplo:
+  ```bash
+  source .env
+  mvn spring-boot:run
+  ```
+- Em produção, defina as variáveis (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, etc.) no serviço/CI sem versioná-las no repositório.
+
+### 8. Captura de sessões/respostas
+
+- Cada voto gera uma sessão de resposta com metadados (IP, user-agent, dispositivo, SO, navegador, origem, localização e status concluído/abandono).
+- Esses dados serão usados para os dashboards e métricas de audiência. O backend tenta inferir device/OS/browser a partir do `User-Agent`, mas o frontend pode enviar campos específicos no corpo do voto (`deviceType`, `operatingSystem`, `browser`, `source`, `country`, `state`, `city`, `status`, `startedAt`, `completedAt`).
+
+### 9. Dashboards
+
+- Após autenticação (role `ADMIN`), o endpoint `GET /api/dashboard/overview` retorna métricas globais:
+  - Totais: pesquisas (ativas/inativas), respostas, respostas nos últimos 7/30 dias.
+  - Taxas médias de conclusão/abandono e tempo médio de resposta.
+  - Rankings: pesquisas mais respondidas, maior taxa de conclusão/abandono, recém-criadas e próximas do vencimento.
+  - Use o token JWT no header `Authorization` para acessar.
+- Para diagnósticos por pesquisa específica, utilize `GET /api/dashboard/surveys/{id}?from=2025-11-01T00:00:00&to=2025-11-20T23:59:59`.
+  - Retorna métricas da pesquisa (totais, taxas, tempo médio, pergunta com mais abandono, dispositivo predominante).
+  - Estatísticas por pergunta/opção (contagens, percentuais).
+  - Séries temporais (respostas por dia/hora) e distribuição da audiência (device/OS/browser/origem/geo).
+- Para a audiência detalhada utilize `GET /api/dashboard/surveys/{id}/audience?from=...&to=...`.
+  - Entrega distribuições por dispositivo, SO, navegador, origem, país/estado/cidade.
+  - Mostra horários/dias de pico, tempo médio até abandono, respondentes únicos x duplicados e possíveis indícios suspeitos.
+
+## Privacidade (LGPD)
+
+- O backend registra IP, user-agent e localização enviados pelo frontend em `ResponseSession`.
+- Em produção, considere anonimizar/truncar IP (ex.: remover último octeto ou aplicar hash com salt) e definir retenção (ex.: 90 dias).
+- Exiba consentimento no frontend antes de coletar dados de audiência e envie somente os campos autorizados.
+- Consulte `src/main/resources/db/migration/README-lgpd.md` para recomendações adicionais.
+
+### Audience/IP anon por perfil
+- **dev** (`application-dev.properties`): `AUDIENCE_ENABLED=true`, `IP_ANONYMIZE=true` por padrão. Ajuste via env para testar ambos os cenários.
+- **default/local** (`application.properties`): lê `AUDIENCE_ENABLED`/`IP_ANONYMIZE` do ambiente (defaults true). Use para validar a API contra MySQL local sem seeds obrigatórios.
+- **prod** (`application-prod.properties`): exige `JWT_SECRET`, `DB_*`, `FRONTEND_ORIGINS`. Seeds desligados. Ajuste `AUDIENCE_ENABLED` e `IP_ANONYMIZE` conforme política; `RETENTION_DAYS` e `app.privacy.cleanup-cron` definem a limpeza de sessões.
+
+### Métricas (Prometheus)
+- Endpoint: `/api/actuator/prometheus` (proteja com auth/role).
+- Principais métricas customizadas:
+  - `request.validation.failures` (conta erros de validação/negócio).
+  - `vote.duplicate.blocked` (bloqueios por janela antifraude).
+  - `survey.operations{type=create|update|delete}`, `question.operations{...}`, `option.operations{...}`.
+- Métricas padrão do Actuator/Micrometer (JVM, Hikari, HTTP server) também estão expostas.
+
+## Guia rápido para o Backoffice (ADMIN)
+- Login: `POST /api/auth/login` com `{ "username": "admin", "password": "admin" }` em dev; resposta contém `token`.
+- Em qualquer rota interna, enviar `Authorization: Bearer <token>`.
+- CRUD:
+  - Surveys: `GET/POST/PUT/DELETE /api/surveys` (estrutura completa: `GET /api/surveys/{id}/structure`).
+  - Questions: `GET/POST/PUT/DELETE /api/questions`.
+  - Options: `GET/POST/PUT/DELETE /api/options`.
+- Dashboards/analytics (ADMIN): `GET /api/dashboard/overview`, `GET /api/dashboard/surveys/{id}`, `GET /api/dashboard/surveys/{id}/audience`.
+- Paginação/sort: `page`, `size` (máx 100), `sort`, `direction` em listagens.
+- Correlation-id: propagar `X-Correlation-Id` para rastrear requisições; o backend gera se ausente.
+- Exemplos de payload (criação):
+  - Survey: `{"titulo":"Pesquisa X","ativo":true,"dataValidade":"2025-12-31T23:59:59"}`
+  - Question: `{"surveyId":1,"texto":"Pergunta?","ordem":1,"ativo":true}`
+  - Option: `{"questionId":10,"texto":"Opção","ativo":true}`
+
+## Configuração de ambiente
+
+- Perfis:
+  - `dev`: H2 em memória, seeds automáticos, logs verbosos. Executar com `-Dspring-boot.run.profiles=dev`.
+  - `prod`: MySQL, Flyway, seeds desativados, pool Hikari, DevTools/Livereload desligados. Ative com `SPRING_PROFILES_ACTIVE=prod`.
+- Variáveis principais:
+  - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
+  - `JWT_SECRET` (mínimo 32 chars), `JWT_EXPIRATION`
+  - `FRONTEND_ORIGINS` (lista separada por vírgula)
+  - `AUDIENCE_ENABLED` (true/false), `IP_ANONYMIZE` (true/false), `RETENTION_DAYS`
+
 ## Endpoints
 
 ### Health Check
@@ -100,7 +191,6 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
     }
     ```
 
-#### Criar nova pesquisa
 - **POST** `/api/surveys`
   - Body (JSON):
     ```json
@@ -143,6 +233,7 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
 #### Deletar pesquisa
 - **DELETE** `/api/surveys/{id}`
   - Resposta: Status 204 (No Content)
+  - Observações: remove automaticamente perguntas, opções e votos associados antes de excluir a pesquisa
 
 ### Modelo de Dados - Survey
 
@@ -360,7 +451,7 @@ src/
 
 ## CORS
 
-A API está configurada para aceitar requisições do frontend React em `http://localhost:3000`.
+A lista de origens permitidas é definida em `app.cors.allowed-origins` (arquivo `application.properties`). Por padrão já inclui `http://localhost:3000` (Create React App) e `http://localhost:5173` (Vite). Acrescente novas origens separadas por vírgula conforme necessário.
 
 ## Validações
 
@@ -590,3 +681,25 @@ curl -X PUT http://localhost:8080/api/options/1 \
 ```bash
 curl -X DELETE http://localhost:8080/api/options/1
 ```
+### Admin - Usuários do Backoffice
+
+Requer token JWT válido com role `ADMIN`.
+
+- **GET** `/api/admin/users` – lista todos os usuários administrativos
+- **GET** `/api/admin/users/{id}` – detalhes de um usuário
+- **POST** `/api/admin/users`
+  ```json
+  {
+    "username": "novo.admin",
+    "password": "senhaSegura123",
+    "role": "ADMIN"
+  }
+  ```
+- **PUT** `/api/admin/users/{id}` – atualiza username/role
+- **PATCH** `/api/admin/users/{id}/password`
+  ```json
+  {
+    "newPassword": "novaSenha"
+  }
+  ```
+- **DELETE** `/api/admin/users/{id}` – remove usuário

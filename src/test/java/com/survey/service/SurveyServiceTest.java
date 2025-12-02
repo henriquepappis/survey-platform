@@ -11,7 +11,9 @@ import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.OptionRepository;
 import com.survey.repository.QuestionRepository;
+import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
+import com.survey.repository.VoteRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +47,12 @@ class SurveyServiceTest {
     @Mock
     private OptionRepository optionRepository;
 
+    @Mock
+    private VoteRepository voteRepository;
+
+    @Mock
+    private ResponseSessionRepository responseSessionRepository;
+
     private SurveyService surveyService;
 
     @BeforeEach
@@ -53,6 +61,8 @@ class SurveyServiceTest {
                 surveyRepository,
                 questionRepository,
                 optionRepository,
+                voteRepository,
+                responseSessionRepository,
                 new SimpleMeterRegistry());
     }
 
@@ -168,12 +178,29 @@ class SurveyServiceTest {
         verify(optionRepository, never()).findByQuestionIdIn(anyList());
     }
 
+    @Test
+    @DisplayName("delete deve remover votos, opções e perguntas antes de apagar a pesquisa")
+    void delete_shouldCascadeChildEntities() {
+        when(surveyRepository.existsById(1L)).thenReturn(true);
+        Question question = new Question();
+        question.setId(11L);
+        when(questionRepository.findBySurveyIdOrderByOrdemAsc(1L)).thenReturn(List.of(question));
+
+        surveyService.delete(1L);
+
+        verify(responseSessionRepository).deleteBySurveyId(1L);
+        verify(voteRepository).deleteBySurveyId(1L);
+        verify(optionRepository).deleteByQuestionIdIn(List.of(11L));
+        verify(questionRepository).deleteBySurveyId(1L);
+        verify(surveyRepository).deleteById(1L);
+    }
+
     private Survey buildSurvey(Long id, String titulo, boolean ativo) {
         Survey survey = new Survey();
         survey.setId(id);
         survey.setTitulo(titulo);
         survey.setAtivo(ativo);
-        survey.setDataValidade(LocalDateTime.now());
+        survey.setDataValidade(LocalDateTime.now().plusDays(60));
         return survey;
     }
 }

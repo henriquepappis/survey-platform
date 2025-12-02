@@ -51,5 +51,5 @@ public class SurveyRequestDTO {
     public void setDataValidade(LocalDateTime dataValidade) {
         this.dataValidade = dataValidade;
     }
-}
 
+}

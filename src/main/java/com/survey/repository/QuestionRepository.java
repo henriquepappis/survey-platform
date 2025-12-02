@@ -23,4 +23,6 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     boolean existsBySurveyIdAndOrdemAndIdNot(Long surveyId, Integer ordem, Long id);
 
     long countBySurveyId(Long surveyId);
+
+    void deleteBySurveyId(Long surveyId);
 }

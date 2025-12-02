@@ -3,16 +3,22 @@ package com.survey.service;
 import com.survey.dto.VoteRequestDTO;
 import com.survey.entity.Option;
 import com.survey.entity.Question;
+import com.survey.entity.ResponseSession;
 import com.survey.entity.Survey;
+import com.survey.entity.Vote;
+import com.survey.exception.BusinessException;
+import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.OptionRepository;
 import com.survey.repository.QuestionRepository;
 import com.survey.repository.SurveyRepository;
 import com.survey.repository.VoteRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -31,9 +37,25 @@ class VoteServiceTest {
     private OptionRepository optionRepository;
     @Mock
     private VoteRepository voteRepository;
+    @Mock
+    private ResponseSessionRepository responseSessionRepository;
 
-    @InjectMocks
     private VoteService voteService;
+
+    @BeforeEach
+    void setUp() {
+        voteService = new VoteService(
+                surveyRepository,
+                questionRepository,
+                optionRepository,
+                voteRepository,
+                responseSessionRepository,
+                0L, // janela desabilitada para testes unitários
+                true,
+                true,
+                new SimpleMeterRegistry()
+        );
+    }
 
     @Test
     @DisplayName("registerVote deve validar relacionamentos pertencentes")
@@ -45,11 +67,22 @@ class VoteServiceTest {
         when(surveyRepository.findById(1L)).thenReturn(Optional.of(survey));
         when(questionRepository.findById(2L)).thenReturn(Optional.of(question));
         when(optionRepository.findById(3L)).thenReturn(Optional.of(option));
+        when(responseSessionRepository.save(any())).thenAnswer(invocation -> {
+            ResponseSession saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 99L);
+            return saved;
+        });
+        when(voteRepository.save(any())).thenAnswer(invocation -> {
+            Vote saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 100L);
+            return saved;
+        });
 
         VoteRequestDTO request = new VoteRequestDTO(1L, 2L, 3L);
 
         voteService.registerVote(request, "127.0.0.1", "JUnit");
 
+        verify(responseSessionRepository).save(any());
         verify(voteRepository).save(any());
     }
 
@@ -61,7 +94,7 @@ class VoteServiceTest {
 
         VoteRequestDTO request = new VoteRequestDTO(1L, 2L, 3L);
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(BusinessException.class,
                 () -> voteService.registerVote(request, "127.0.0.1", "UA"));
     }
 
@@ -70,7 +103,7 @@ class VoteServiceTest {
         survey.setId(id);
         survey.setTitulo("Pesquisa");
         survey.setAtivo(active);
-        survey.setDataValidade(LocalDateTime.now());
+        survey.setDataValidade(LocalDateTime.now().plusDays(1));
         return survey;
     }
 

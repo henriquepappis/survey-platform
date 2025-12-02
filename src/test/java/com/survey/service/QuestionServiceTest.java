@@ -8,6 +8,7 @@ import com.survey.entity.Survey;
 import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.QuestionRepository;
+import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,11 +39,14 @@ class QuestionServiceTest {
     @Mock
     private SurveyRepository surveyRepository;
 
+    @Mock
+    private ResponseSessionRepository responseSessionRepository;
+
     private QuestionService questionService;
 
     @BeforeEach
     void setUp() {
-        questionService = new QuestionService(questionRepository, surveyRepository, new SimpleMeterRegistry());
+        questionService = new QuestionService(questionRepository, surveyRepository, responseSessionRepository, new SimpleMeterRegistry());
     }
 
     @Test
@@ -134,6 +138,17 @@ class QuestionServiceTest {
         when(questionRepository.existsById(123L)).thenReturn(false);
 
         assertThrows(ResourceNotFoundException.class, () -> questionService.delete(123L));
+    }
+
+    @Test
+    @DisplayName("delete deve apagar sessões de resposta vinculadas")
+    void delete_shouldRemoveResponseSessions() {
+        when(questionRepository.existsById(10L)).thenReturn(true);
+
+        questionService.delete(10L);
+
+        verify(responseSessionRepository).deleteByQuestionId(10L);
+        verify(questionRepository).deleteById(10L);
     }
 
     private Survey buildSurvey(Long id, String title, boolean active) {

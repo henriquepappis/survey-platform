@@ -77,7 +77,7 @@ public class QuestionController {
 
     private Pageable buildPageable(int page, int size, String sort, String direction) {
         int safePage = Math.max(page, 0);
-        int safeSize = size <= 0 ? 20 : size;
+        int safeSize = size <= 0 ? 20 : Math.min(size, 100);
         Sort.Direction dir;
         try {
             dir = Sort.Direction.fromString(direction);

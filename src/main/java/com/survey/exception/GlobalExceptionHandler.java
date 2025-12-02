@@ -2,6 +2,8 @@ package com.survey.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -15,6 +17,12 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private final Counter validationFailureCounter;
+
+    public GlobalExceptionHandler(MeterRegistry meterRegistry) {
+        this.validationFailureCounter = meterRegistry.counter("request.validation.failures");
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleResourceNotFoundException(ResourceNotFoundException ex,
@@ -44,6 +52,7 @@ public class GlobalExceptionHandler {
                 errors.put(error.getField(), error.getDefaultMessage())
         );
 
+        validationFailureCounter.increment();
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Erro de validação",
                 "Dados inválidos",
@@ -58,6 +67,7 @@ public class GlobalExceptionHandler {
         ex.getConstraintViolations()
                 .forEach(violation -> errors.put(violation.getPropertyPath().toString(), violation.getMessage()));
 
+        validationFailureCounter.increment();
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Erro de validação",
                 "Parâmetros inválidos",
@@ -70,6 +80,7 @@ public class GlobalExceptionHandler {
                                                                HttpServletRequest request) {
         String message = String.format("Parâmetro '%s' recebeu valor inválido: %s",
                 ex.getName(), ex.getValue());
+        validationFailureCounter.increment();
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Erro de validação",
                 message,
@@ -80,6 +91,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> handleMessageNotReadable(HttpMessageNotReadableException ex,
                                                                      HttpServletRequest request) {
+        validationFailureCounter.increment();
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Erro de validação",
                 "Payload JSON inválido ou malformado",

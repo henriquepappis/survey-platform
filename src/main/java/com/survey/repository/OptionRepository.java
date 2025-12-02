@@ -27,4 +27,6 @@ public interface OptionRepository extends JpaRepository<Option, Long> {
     Optional<Option> findByIdAndQuestionId(Long id, Long questionId);
 
     long countByQuestionIdAndAtivoTrue(Long questionId);
+
+    void deleteByQuestionIdIn(List<Long> questionIds);
 }

@@ -1,6 +1,7 @@
 package com.survey.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -16,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GlobalExceptionHandlerTest {
 
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    private final GlobalExceptionHandler handler = new GlobalExceptionHandler(new SimpleMeterRegistry());
 
     @Test
     @DisplayName("handleResourceNotFoundException deve retornar 404 com path correto")
@@ -63,6 +64,18 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().getMessage()).contains("id");
+    }
+
+    @Test
+    @DisplayName("handleBusinessException deve retornar 400 com mensagem de negócio")
+    void handleBusinessException_shouldReturnBadRequest() {
+        HttpServletRequest request = new MockHttpServletRequest();
+        var response = handler.handleBusinessException(
+                new BusinessException("Regra de negócio violada"),
+                request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().getMessage()).contains("Regra de negócio");
     }
 
     private static class Dummy {

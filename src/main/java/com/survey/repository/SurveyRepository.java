@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,4 +22,10 @@ public interface SurveyRepository extends JpaRepository<Survey, Long> {
     boolean existsByTitulo(String titulo);
 
     boolean existsByTituloAndIdNot(String titulo, Long id);
+
+    long countByAtivoTrue();
+
+    List<Survey> findTop5ByOrderByCreatedAtDesc();
+
+    List<Survey> findTop5ByDataValidadeAfterOrderByDataValidadeAsc(LocalDateTime date);
 }

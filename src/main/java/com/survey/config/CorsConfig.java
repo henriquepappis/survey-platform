@@ -32,7 +32,8 @@ public class CorsConfig {
 
         config.setAllowCredentials(true);
         if (origins.isEmpty()) {
-            config.addAllowedOriginPattern("*");
+            // fallback seguro: apenas locais de dev
+            config.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173"));
         } else {
             config.setAllowedOrigins(origins);
         }

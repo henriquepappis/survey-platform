@@ -22,6 +22,7 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -297,6 +298,7 @@ class SurveyControllerTest {
 
         private boolean findAllCalled;
         private boolean findAllAtivasCalled;
+
         private Long lastFindByIdId;
         private boolean createCalled;
         private SurveyRequestDTO lastCreateRequest;
@@ -309,15 +311,15 @@ class SurveyControllerTest {
         private SurveyDetailsResponseDTO structureResult;
         private Long lastStructureSurveyId;
         private boolean lastStructureIncludeInactive;
+        private Integer lastPageSize;
 
         TestSurveyService() {
-            super(null, null, null, new SimpleMeterRegistry());
+            super(null, null, null, null, null, new SimpleMeterRegistry());
         }
 
         void setFindAllResult(List<SurveyResponseDTO> result) {
             this.findAllResult = result;
         }
-
         void setFindAllAtivasResult(List<SurveyResponseDTO> result) {
             this.findAllAtivasResult = result;
         }
@@ -340,14 +342,6 @@ class SurveyControllerTest {
 
         void setStructureResult(SurveyDetailsResponseDTO structureResult) {
             this.structureResult = structureResult;
-        }
-
-        boolean wasFindAllCalled() {
-            return findAllCalled;
-        }
-
-        boolean wasFindAllAtivasCalled() {
-            return findAllAtivasCalled;
         }
 
         Long getLastFindByIdId() {
@@ -382,6 +376,14 @@ class SurveyControllerTest {
             return lastStructureIncludeInactive;
         }
 
+        boolean wasFindAllCalled() {
+            return findAllCalled;
+        }
+
+        boolean wasFindAllAtivasCalled() {
+            return findAllAtivasCalled;
+        }
+
         boolean wasDeleteCalled() {
             return deleteCalled;
         }
@@ -393,12 +395,14 @@ class SurveyControllerTest {
         @Override
         public PagedResponse<SurveyResponseDTO> findAll(Pageable pageable) {
             findAllCalled = true;
+            lastPageSize = pageable.getPageSize();
             return toPaged(findAllResult, pageable);
         }
 
         @Override
         public PagedResponse<SurveyResponseDTO> findAllAtivas(Pageable pageable) {
             findAllAtivasCalled = true;
+            lastPageSize = pageable.getPageSize();
             return toPaged(findAllAtivasResult, pageable);
         }
 
@@ -441,6 +445,11 @@ class SurveyControllerTest {
             return structureResult;
         }
 
+        Integer getLastPageSize() {
+            return lastPageSize;
+        }
+
+
         private PagedResponse<SurveyResponseDTO> toPaged(List<SurveyResponseDTO> content, Pageable pageable) {
             int size = content.size();
             int pageNumber = pageable != null ? pageable.getPageNumber() : 0;
@@ -457,5 +466,16 @@ class SurveyControllerTest {
                     content.isEmpty()
             );
         }
+    }
+
+    @Test
+    @DisplayName("GET /api/surveys deve limitar size máximo em 100")
+    void getAllSurveys_shouldClampPageSize() throws Exception {
+        surveyService.setFindAllResult(List.of());
+
+        mockMvc.perform(get("/api/surveys").param("size", "1000"))
+                .andExpect(status().isOk());
+
+        assertThat(surveyService.getLastPageSize()).isEqualTo(100);
     }
 }

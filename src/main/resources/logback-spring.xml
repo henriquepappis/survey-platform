@@ -2,22 +2,16 @@
 <configuration scan="true" scanPeriod="60 seconds">
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n"/>
-
     <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
             <providers>
                 <timestamp>
                     <timeZone>UTC</timeZone>
                 </timestamp>
-                <pattern>
-                    <pattern>{"level":"%level","logger":"%logger"}</pattern>
-                </pattern>
-                <mdcFields/>
-                <context/>
                 <logLevel/>
                 <loggerName/>
                 <threadName/>
+                <mdc/>
                 <message/>
                 <arguments/>
                 <stackTrace/>
