@@ -65,6 +65,7 @@ class SurveyControllerTest {
         SurveyResponseDTO dto = new SurveyResponseDTO();
         dto.setId(id);
         dto.setTitulo(titulo);
+        dto.setDescricao("Descricao");
         dto.setAtivo(ativo);
         dto.setDataValidade(dataValidade);
         if (dataValidade != null) {
@@ -77,7 +78,7 @@ class SurveyControllerTest {
     private SurveyRequestDTO buildSurveyRequest(String titulo,
             Boolean ativo,
             LocalDateTime dataValidade) {
-        return new SurveyRequestDTO(titulo, ativo, dataValidade);
+        return new SurveyRequestDTO(titulo, "Descricao", ativo, dataValidade);
     }
 
     // ------- testes -------
@@ -140,6 +141,7 @@ class SurveyControllerTest {
         SurveyDetailsResponseDTO structure = new SurveyDetailsResponseDTO(
                 1L,
                 "Pesquisa NPS",
+                "Desc",
                 true,
                 LocalDateTime.now().plusDays(30),
                 LocalDateTime.now().minusDays(1),
@@ -314,7 +316,7 @@ class SurveyControllerTest {
         private Integer lastPageSize;
 
         TestSurveyService() {
-            super(null, null, null, null, null, new SimpleMeterRegistry());
+            super(null, null, null, new SimpleMeterRegistry());
         }
 
         void setFindAllResult(List<SurveyResponseDTO> result) {
@@ -439,7 +441,7 @@ class SurveyControllerTest {
         }
 
         @Override
-        public SurveyDetailsResponseDTO getSurveyStructure(Long id, boolean includeInactiveOptions) {
+        public SurveyDetailsResponseDTO getSurveyStructure(Long id, boolean includeInactiveOptions, boolean includeDeleted) {
             lastStructureSurveyId = id;
             lastStructureIncludeInactive = includeInactiveOptions;
             return structureResult;

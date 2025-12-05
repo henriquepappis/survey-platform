@@ -4,11 +4,15 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "surveys")
+@SQLDelete(sql = "UPDATE surveys SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@Where(clause = "deleted_at IS NULL")
 public class Survey {
 
     @Id
@@ -19,6 +23,10 @@ public class Survey {
     @Size(min = 3, max = 255, message = "Título deve ter entre 3 e 255 caracteres")
     @Column(nullable = false, length = 255)
     private String titulo;
+
+    @Size(max = 1000, message = "Descrição deve ter no máximo 1000 caracteres")
+    @Column(name = "descricao", length = 1000)
+    private String descricao;
 
     @NotNull(message = "Status ativo é obrigatório")
     @Column(nullable = false)
@@ -32,6 +40,9 @@ public class Survey {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @PrePersist
     protected void onCreate() {
@@ -71,6 +82,14 @@ public class Survey {
         this.titulo = titulo;
     }
 
+    public String getDescricao() {
+        return descricao;
+    }
+
+    public void setDescricao(String descricao) {
+        this.descricao = descricao;
+    }
+
     public Boolean getAtivo() {
         return ativo;
     }
@@ -101,5 +120,13 @@ public class Survey {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
     }
 }

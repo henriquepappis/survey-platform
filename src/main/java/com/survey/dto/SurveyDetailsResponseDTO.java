@@ -11,6 +11,7 @@ public class SurveyDetailsResponseDTO {
 
     private Long id;
     private String titulo;
+    private String descricao;
     private Boolean ativo;
     private LocalDateTime dataValidade;
     private LocalDateTime createdAt;
@@ -19,6 +20,7 @@ public class SurveyDetailsResponseDTO {
 
     public SurveyDetailsResponseDTO(Long id,
                                     String titulo,
+                                    String descricao,
                                     Boolean ativo,
                                     LocalDateTime dataValidade,
                                     LocalDateTime createdAt,
@@ -26,6 +28,7 @@ public class SurveyDetailsResponseDTO {
                                     List<QuestionDetails> questions) {
         this.id = id;
         this.titulo = titulo;
+        this.descricao = descricao;
         this.ativo = ativo;
         this.dataValidade = dataValidade;
         this.createdAt = createdAt;
@@ -39,6 +42,10 @@ public class SurveyDetailsResponseDTO {
 
     public String getTitulo() {
         return titulo;
+    }
+
+    public String getDescricao() {
+        return descricao;
     }
 
     public Boolean getAtivo() {

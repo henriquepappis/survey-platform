@@ -4,6 +4,8 @@ import com.survey.entity.Option;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -29,4 +31,7 @@ public interface OptionRepository extends JpaRepository<Option, Long> {
     long countByQuestionIdAndAtivoTrue(Long questionId);
 
     void deleteByQuestionIdIn(List<Long> questionIds);
+
+    @Query(value = "SELECT * FROM options WHERE question_id IN (:questionIds)", nativeQuery = true)
+    List<Option> findByQuestionIdInIncludingDeleted(@Param("questionIds") List<Long> questionIds);
 }

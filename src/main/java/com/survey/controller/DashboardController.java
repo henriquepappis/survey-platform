@@ -41,8 +41,9 @@ public class DashboardController {
             @org.springframework.web.bind.annotation.RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
             @org.springframework.web.bind.annotation.RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to) {
-        return ResponseEntity.ok(dashboardService.getSurveyDashboard(id, from, to));
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean includeDeleted) {
+        return ResponseEntity.ok(dashboardService.getSurveyDashboard(id, from, to, includeDeleted));
     }
 
     @GetMapping("/surveys/{id}/audience")
@@ -57,7 +58,8 @@ public class DashboardController {
             @org.springframework.web.bind.annotation.RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime from,
             @org.springframework.web.bind.annotation.RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to) {
-        return ResponseEntity.ok(dashboardService.getSurveyAudience(id, from, to));
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime to,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean includeDeleted) {
+        return ResponseEntity.ok(dashboardService.getSurveyAudience(id, from, to, includeDeleted));
     }
 }

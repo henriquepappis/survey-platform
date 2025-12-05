@@ -8,7 +8,6 @@ import com.survey.entity.Survey;
 import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.QuestionRepository;
-import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,14 +38,11 @@ class QuestionServiceTest {
     @Mock
     private SurveyRepository surveyRepository;
 
-    @Mock
-    private ResponseSessionRepository responseSessionRepository;
-
     private QuestionService questionService;
 
     @BeforeEach
     void setUp() {
-        questionService = new QuestionService(questionRepository, surveyRepository, responseSessionRepository, new SimpleMeterRegistry());
+        questionService = new QuestionService(questionRepository, surveyRepository, new SimpleMeterRegistry());
     }
 
     @Test
@@ -141,14 +137,15 @@ class QuestionServiceTest {
     }
 
     @Test
-    @DisplayName("delete deve apagar sessões de resposta vinculadas")
-    void delete_shouldRemoveResponseSessions() {
-        when(questionRepository.existsById(10L)).thenReturn(true);
+    @DisplayName("delete deve marcar deletedAt no soft delete")
+    void delete_shouldSoftDelete() {
+        Question question = buildQuestion(10L, "Q", 1, buildSurvey(1L, "S", true));
+        when(questionRepository.findById(10L)).thenReturn(Optional.of(question));
+        when(questionRepository.save(any(Question.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         questionService.delete(10L);
 
-        verify(responseSessionRepository).deleteByQuestionId(10L);
-        verify(questionRepository).deleteById(10L);
+        verify(questionRepository).save(argThat(q -> q.getDeletedAt() != null));
     }
 
     private Survey buildSurvey(Long id, String title, boolean active) {

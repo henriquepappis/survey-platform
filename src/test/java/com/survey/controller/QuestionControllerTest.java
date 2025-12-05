@@ -214,7 +214,7 @@ class QuestionControllerTest {
         private Long lastDeleteId;
 
         TestQuestionService() {
-            super(null, null, null, new SimpleMeterRegistry());
+            super(null, null, new SimpleMeterRegistry());
         }
 
         void setFindAllResult(List<QuestionResponseDTO> result) {

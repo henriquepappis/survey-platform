@@ -11,9 +11,7 @@ import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.OptionRepository;
 import com.survey.repository.QuestionRepository;
-import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
-import com.survey.repository.VoteRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import net.logstash.logback.argument.StructuredArguments;
@@ -26,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -41,8 +40,6 @@ public class SurveyService {
     private final SurveyRepository surveyRepository;
     private final QuestionRepository questionRepository;
     private final OptionRepository optionRepository;
-    private final VoteRepository voteRepository;
-    private final ResponseSessionRepository responseSessionRepository;
     private final Counter surveyCreatedCounter;
     private final Counter surveyUpdatedCounter;
     private final Counter surveyDeletedCounter;
@@ -51,14 +48,10 @@ public class SurveyService {
     public SurveyService(SurveyRepository surveyRepository,
                          QuestionRepository questionRepository,
                          OptionRepository optionRepository,
-                         VoteRepository voteRepository,
-                         ResponseSessionRepository responseSessionRepository,
                          MeterRegistry meterRegistry) {
         this.surveyRepository = surveyRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
-        this.voteRepository = voteRepository;
-        this.responseSessionRepository = responseSessionRepository;
         this.surveyCreatedCounter = meterRegistry.counter("survey.operations", "type", "create");
         this.surveyUpdatedCounter = meterRegistry.counter("survey.operations", "type", "update");
         this.surveyDeletedCounter = meterRegistry.counter("survey.operations", "type", "delete");
@@ -66,6 +59,11 @@ public class SurveyService {
 
     public PagedResponse<SurveyResponseDTO> findAll(Pageable pageable) {
         Page<Survey> page = surveyRepository.findAll(pageable);
+        return buildPagedResponse(page, pageable);
+    }
+
+    public PagedResponse<SurveyResponseDTO> findAllIncludingDeleted(Pageable pageable) {
+        Page<Survey> page = surveyRepository.findAllIncludingDeleted(pageable);
         return buildPagedResponse(page, pageable);
     }
 
@@ -80,20 +78,27 @@ public class SurveyService {
         return convertToDTO(survey);
     }
 
-    public SurveyDetailsResponseDTO getSurveyStructure(Long id, boolean includeInactiveOptions) {
-        Survey survey = surveyRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Pesquisa não encontrada com id: " + id));
+    public SurveyDetailsResponseDTO getSurveyStructure(Long id, boolean includeInactiveOptions, boolean includeDeleted) {
+        Survey survey = includeDeleted
+                ? surveyRepository.findByIdIncludingDeleted(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Pesquisa não encontrada com id: " + id))
+                : surveyRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Pesquisa não encontrada com id: " + id));
 
-        List<Question> questions = questionRepository.findBySurveyIdOrderByOrdemAsc(id);
+        List<Question> questions = includeDeleted
+                ? questionRepository.findBySurveyIdIncludingDeleted(id)
+                : questionRepository.findBySurveyIdOrderByOrdemAsc(id);
         List<Long> questionIds = questions.stream()
                 .map(Question::getId)
                 .toList();
 
         Map<Long, List<Option>> optionsGrouped = questionIds.isEmpty()
                 ? Collections.emptyMap()
-                : (includeInactiveOptions
-                    ? optionRepository.findByQuestionIdIn(questionIds)
-                    : optionRepository.findByQuestionIdInAndAtivoTrue(questionIds))
+                : (includeDeleted
+                    ? optionRepository.findByQuestionIdInIncludingDeleted(questionIds)
+                    : (includeInactiveOptions
+                        ? optionRepository.findByQuestionIdIn(questionIds)
+                        : optionRepository.findByQuestionIdInAndAtivoTrue(questionIds)))
                 .stream()
                 .collect(Collectors.groupingBy(option -> option.getQuestion().getId()));
 
@@ -116,6 +121,7 @@ public class SurveyService {
         return new SurveyDetailsResponseDTO(
                 survey.getId(),
                 survey.getTitulo(),
+                survey.getDescricao(),
                 survey.getAtivo(),
                 survey.getDataValidade(),
                 survey.getCreatedAt(),
@@ -147,6 +153,7 @@ public class SurveyService {
         }
 
         survey.setTitulo(requestDTO.getTitulo());
+        survey.setDescricao(requestDTO.getDescricao());
         survey.setAtivo(requestDTO.getAtivo());
         survey.setDataValidade(requestDTO.getDataValidade());
 
@@ -193,30 +200,74 @@ public class SurveyService {
     }
 
     public void delete(Long id) {
-        if (!surveyRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Pesquisa não encontrada com id: " + id);
+        Survey survey = surveyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pesquisa não encontrada com id: " + id));
+
+        LocalDateTime now = LocalDateTime.now();
+        survey.setAtivo(false);
+        survey.setDeletedAt(now);
+        surveyRepository.save(survey);
+
+        List<Question> questions = questionRepository.findBySurveyIdOrderByOrdemAsc(id);
+        List<Long> questionIds = questions.stream().map(Question::getId).toList();
+
+        List<Option> options = questionIds.isEmpty()
+                ? List.of()
+                : optionRepository.findByQuestionIdIn(questionIds);
+
+        options.forEach(option -> {
+            option.setAtivo(false);
+            option.setDeletedAt(now);
+        });
+        if (!options.isEmpty()) {
+            optionRepository.saveAll(options);
         }
 
-        responseSessionRepository.deleteBySurveyId(id);
-        voteRepository.deleteBySurveyId(id);
-
-        List<Long> questionIds = questionRepository.findBySurveyIdOrderByOrdemAsc(id).stream()
-                .map(Question::getId)
-                .toList();
-
-        if (!questionIds.isEmpty()) {
-            optionRepository.deleteByQuestionIdIn(questionIds);
+        questions.forEach(question -> question.setDeletedAt(now));
+        if (!questions.isEmpty()) {
+            questionRepository.saveAll(questions);
         }
 
-        questionRepository.deleteBySurveyId(id);
-        surveyRepository.deleteById(id);
         surveyDeletedCounter.increment();
-        LOGGER.info("Survey deleted {}", StructuredArguments.kv("surveyId", id));
+        LOGGER.info("Survey soft-deleted {}", StructuredArguments.kv("surveyId", id));
+    }
+
+    public SurveyResponseDTO restore(Long id) {
+        Survey survey = surveyRepository.findByIdIncludingDeleted(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pesquisa não encontrada com id: " + id));
+
+        LocalDateTime now = LocalDateTime.now();
+        survey.setDeletedAt(null);
+        survey.setAtivo(true);
+        survey.setUpdatedAt(now);
+
+        List<Question> questions = questionRepository.findBySurveyIdIncludingDeleted(id);
+        List<Long> questionIds = questions.stream().map(Question::getId).toList();
+        List<Option> options = questionIds.isEmpty()
+                ? List.of()
+                : optionRepository.findByQuestionIdInIncludingDeleted(questionIds);
+
+        options.forEach(option -> {
+            option.setDeletedAt(null);
+            option.setAtivo(true);
+        });
+        if (!options.isEmpty()) {
+            optionRepository.saveAll(options);
+        }
+
+        questions.forEach(question -> question.setDeletedAt(null));
+        if (!questions.isEmpty()) {
+            questionRepository.saveAll(questions);
+        }
+
+        Survey restored = surveyRepository.save(survey);
+        return convertToDTO(restored);
     }
 
     private Survey convertToEntity(SurveyRequestDTO dto) {
         Survey survey = new Survey();
         survey.setTitulo(dto.getTitulo());
+        survey.setDescricao(dto.getDescricao());
         survey.setAtivo(dto.getAtivo());
         survey.setDataValidade(dto.getDataValidade());
         return survey;
@@ -226,10 +277,12 @@ public class SurveyService {
         return new SurveyResponseDTO(
                 survey.getId(),
                 survey.getTitulo(),
+                survey.getDescricao(),
                 survey.getAtivo(),
                 survey.getDataValidade(),
                 survey.getCreatedAt(),
-                survey.getUpdatedAt()
+                survey.getUpdatedAt(),
+                survey.getDeletedAt()
         );
     }
 

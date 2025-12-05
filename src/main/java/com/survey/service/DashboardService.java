@@ -110,9 +110,13 @@ public class DashboardService {
 
     public SurveyDashboardResponse getSurveyDashboard(Long surveyId,
                                                       LocalDateTime from,
-                                                      LocalDateTime to) {
-        Survey survey = surveyRepository.findById(surveyId)
-                .orElseThrow(() -> new IllegalArgumentException("Pesquisa não encontrada"));
+                                                      LocalDateTime to,
+                                                      boolean includeDeleted) {
+        Survey survey = includeDeleted
+                ? surveyRepository.findByIdIncludingDeleted(surveyId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pesquisa não encontrada"))
+                : surveyRepository.findById(surveyId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pesquisa não encontrada"));
 
         LocalDateTime end = to != null ? to : LocalDateTime.now();
         LocalDateTime start = from != null ? from : end.minusDays(30);
@@ -269,9 +273,15 @@ public class DashboardService {
 
     public SurveyAudienceResponse getSurveyAudience(Long surveyId,
                                                     LocalDateTime from,
-                                                    LocalDateTime to) {
-        surveyRepository.findById(surveyId)
-                .orElseThrow(() -> new IllegalArgumentException("Pesquisa não encontrada"));
+                                                    LocalDateTime to,
+                                                    boolean includeDeleted) {
+        if (includeDeleted) {
+            surveyRepository.findByIdIncludingDeleted(surveyId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pesquisa não encontrada"));
+        } else {
+            surveyRepository.findById(surveyId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pesquisa não encontrada"));
+        }
 
         LocalDateTime end = to != null ? to : LocalDateTime.now();
         LocalDateTime start = from != null ? from : end.minusDays(30);

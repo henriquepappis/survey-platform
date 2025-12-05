@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -74,10 +75,10 @@ public class UserService {
     }
 
     public void delete(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Usuário não encontrado");
-        }
-        userRepository.deleteById(id);
+        UserAccount user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        user.setDeletedAt(LocalDateTime.now());
+        userRepository.save(user);
     }
 
     private UserResponseDTO toResponse(UserAccount user) {

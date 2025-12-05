@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -173,12 +174,15 @@ public class OptionService {
     }
 
     public void delete(Long id) {
-        if (!optionRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Opção não encontrada com id: " + id);
-        }
-        optionRepository.deleteById(id);
+        Option option = optionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Opção não encontrada com id: " + id));
+
+        option.setAtivo(false);
+        option.setDeletedAt(LocalDateTime.now());
+        optionRepository.save(option);
+
         optionDeletedCounter.increment();
-        LOGGER.info("Option deleted {}", StructuredArguments.kv("optionId", id));
+        LOGGER.info("Option soft-deleted {}", StructuredArguments.kv("optionId", id));
     }
 
     private Option convertToEntity(OptionRequestDTO dto, Question question) {

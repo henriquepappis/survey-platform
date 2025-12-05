@@ -95,11 +95,11 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
   - Taxas médias de conclusão/abandono e tempo médio de resposta.
   - Rankings: pesquisas mais respondidas, maior taxa de conclusão/abandono, recém-criadas e próximas do vencimento.
   - Use o token JWT no header `Authorization` para acessar.
-- Para diagnósticos por pesquisa específica, utilize `GET /api/dashboard/surveys/{id}?from=2025-11-01T00:00:00&to=2025-11-20T23:59:59`.
+- Para diagnósticos por pesquisa específica, utilize `GET /api/dashboard/surveys/{id}?from=2025-11-01T00:00:00&to=2025-11-20T23:59:59&includeDeleted=true`.
   - Retorna métricas da pesquisa (totais, taxas, tempo médio, pergunta com mais abandono, dispositivo predominante).
   - Estatísticas por pergunta/opção (contagens, percentuais).
   - Séries temporais (respostas por dia/hora) e distribuição da audiência (device/OS/browser/origem/geo).
-- Para a audiência detalhada utilize `GET /api/dashboard/surveys/{id}/audience?from=...&to=...`.
+- Para a audiência detalhada utilize `GET /api/dashboard/surveys/{id}/audience?from=...&to=...&includeDeleted=true`.
   - Entrega distribuições por dispositivo, SO, navegador, origem, país/estado/cidade.
   - Mostra horários/dias de pico, tempo médio até abandono, respondentes únicos x duplicados e possíveis indícios suspeitos.
 
@@ -158,7 +158,9 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
 
 #### Listar todas as pesquisas
 - **GET** `/api/surveys`
-  - Query params (opcional): `?ativo=true` - filtra apenas pesquisas ativas
+  - Query params (opcionais):
+    - `ativo=true` - filtra apenas pesquisas ativas
+    - `includeDeleted=true` - inclui também pesquisas soft-deletadas (ignora filtro `ativo`)
   - Resposta: Lista de pesquisas
 
 #### Buscar pesquisa por ID
@@ -167,7 +169,9 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
 
 #### Buscar estrutura completa da pesquisa (perguntas + opções)
 - **GET** `/api/surveys/{id}/structure`
-  - Query params (opcional): `includeInactiveOptions=false` - define se opções inativas também devem ser retornadas
+  - Query params (opcionais):
+    - `includeInactiveOptions=false` - define se opções inativas também devem ser retornadas
+    - `includeDeleted=false` - inclui pesquisas/perguntas/opções soft-deletadas
   - Resposta:
     ```json
     {
@@ -196,6 +200,7 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
     ```json
     {
       "titulo": "Pesquisa de Satisfação",
+      "descricao": "Texto explicando o objetivo da pesquisa",
       "ativo": true,
       "dataValidade": "2024-12-31T23:59:59"
     }
@@ -209,11 +214,13 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
     [
       {
         "titulo": "Pesquisa de Satisfação",
+        "descricao": "Primeira pesquisa",
         "ativo": true,
         "dataValidade": "2024-12-31T23:59:59"
       },
       {
         "titulo": "Pesquisa de Qualidade",
+        "descricao": "Segunda pesquisa",
         "ativo": true,
         "dataValidade": "2024-12-31T23:59:59"
       }
@@ -241,6 +248,7 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
 {
   "id": 1,
   "titulo": "Pesquisa de Satisfação",
+  "descricao": "Texto explicando o objetivo da pesquisa",
   "ativo": true,
   "dataValidade": "2024-12-31T23:59:59",
   "createdAt": "2024-01-01T10:00:00",
@@ -251,6 +259,7 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
 **Campos:**
 - `id` (Long): ID único da pesquisa (gerado automaticamente)
 - `titulo` (String): Título da pesquisa (obrigatório, 3-255 caracteres)
+- `descricao` (String): Descrição/objetivo da pesquisa (opcional, até 1000 caracteres)
 - `ativo` (Boolean): Status ativo/inativo (obrigatório)
 - `dataValidade` (LocalDateTime): Data de validade da pesquisa (opcional)
 - `createdAt` (LocalDateTime): Data de criação (gerado automaticamente)
@@ -703,3 +712,6 @@ Requer token JWT válido com role `ADMIN`.
   }
   ```
 - **DELETE** `/api/admin/users/{id}` – remove usuário
+
+### Restaurar pesquisa (soft delete)
+- **PATCH** `/api/surveys/{id}/restore` – reativa pesquisa, perguntas e opções marcadas com `deleted_at`

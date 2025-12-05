@@ -50,6 +50,7 @@ public class DataInitializer implements CommandLineRunner {
         if (surveyRepository.count() == 0) {
             Survey survey = new Survey();
             survey.setTitulo("Pesquisa de Satisfação");
+            survey.setDescricao("Pesquisa demo para validar a jornada completa no ambiente dev.");
             survey.setAtivo(true);
             survey.setDataValidade(LocalDateTime.now().plusMonths(1));
             Survey savedSurvey = surveyRepository.save(survey);

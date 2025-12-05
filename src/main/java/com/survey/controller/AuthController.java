@@ -3,6 +3,7 @@ package com.survey.controller;
 import com.survey.dto.AuthRequest;
 import com.survey.dto.AuthResponse;
 import com.survey.security.JwtTokenProvider;
+import com.survey.security.TokenBlacklist;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +28,7 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
+    private final TokenBlacklist tokenBlacklist;
     private final long expirationMs;
     private final int maxAttempts;
     private final long windowMs;
@@ -35,11 +37,13 @@ public class AuthController {
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtTokenProvider tokenProvider,
+                          TokenBlacklist tokenBlacklist,
                           @Value("${app.security.jwt.expiration:3600000}") long expirationMs,
                           @Value("${app.security.login.max-attempts:5}") int maxAttempts,
                           @Value("${app.security.login.window-ms:60000}") long windowMs) {
         this.authenticationManager = authenticationManager;
         this.tokenProvider = tokenProvider;
+        this.tokenBlacklist = tokenBlacklist;
         this.expirationMs = expirationMs;
         this.maxAttempts = maxAttempts;
         this.windowMs = windowMs;
@@ -68,6 +72,25 @@ public class AuthController {
             registerFailure(key);
             return ResponseEntity.status(401).build();
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        String token = resolveToken(request);
+        if (token == null || !tokenProvider.validateToken(token)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        tokenBlacklist.blacklist(token, tokenProvider.getExpiration(token));
+        return ResponseEntity.noContent().build();
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String bearer = request != null ? request.getHeader("Authorization") : null;
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            return bearer.substring(7);
+        }
+        return null;
     }
 
     private boolean isBlocked(String key) {

@@ -11,9 +11,7 @@ import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.OptionRepository;
 import com.survey.repository.QuestionRepository;
-import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
-import com.survey.repository.VoteRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -47,12 +46,6 @@ class SurveyServiceTest {
     @Mock
     private OptionRepository optionRepository;
 
-    @Mock
-    private VoteRepository voteRepository;
-
-    @Mock
-    private ResponseSessionRepository responseSessionRepository;
-
     private SurveyService surveyService;
 
     @BeforeEach
@@ -61,8 +54,6 @@ class SurveyServiceTest {
                 surveyRepository,
                 questionRepository,
                 optionRepository,
-                voteRepository,
-                responseSessionRepository,
                 new SimpleMeterRegistry());
     }
 
@@ -97,7 +88,7 @@ class SurveyServiceTest {
     @Test
     @DisplayName("create deve lançar BusinessException quando título já existe")
     void create_withDuplicatedTitle_shouldThrowBusinessException() {
-        SurveyRequestDTO request = new SurveyRequestDTO("Duplicada", true, null);
+        SurveyRequestDTO request = new SurveyRequestDTO("Duplicada", null, true, null);
         when(surveyRepository.existsByTitulo("Duplicada")).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> surveyService.create(request));
@@ -106,7 +97,7 @@ class SurveyServiceTest {
     @Test
     @DisplayName("create deve salvar pesquisa quando dados válidos")
     void create_withValidData_shouldPersistSurvey() {
-        SurveyRequestDTO request = new SurveyRequestDTO("Nova", true, LocalDateTime.now());
+        SurveyRequestDTO request = new SurveyRequestDTO("Nova", "Desc", true, LocalDateTime.now());
         Survey saved = buildSurvey(10L, "Nova", true);
         when(surveyRepository.existsByTitulo("Nova")).thenReturn(false);
         when(surveyRepository.save(any(Survey.class))).thenReturn(saved);
@@ -121,7 +112,7 @@ class SurveyServiceTest {
     @DisplayName("update deve atualizar pesquisa existente")
     void update_shouldPersistChanges() {
         Survey existing = buildSurvey(5L, "Atual", false);
-        SurveyRequestDTO request = new SurveyRequestDTO("Atualizada", true, null);
+        SurveyRequestDTO request = new SurveyRequestDTO("Atualizada", "Desc", true, null);
         when(surveyRepository.findById(5L)).thenReturn(Optional.of(existing));
         when(surveyRepository.existsByTituloAndIdNot("Atualizada", 5L)).thenReturn(false);
         when(surveyRepository.save(existing)).thenReturn(existing);
@@ -138,7 +129,7 @@ class SurveyServiceTest {
         when(surveyRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class,
-                () -> surveyService.update(99L, new SurveyRequestDTO("t", true, null)));
+                () -> surveyService.update(99L, new SurveyRequestDTO("t", null, true, null)));
     }
 
     @Test
@@ -170,7 +161,7 @@ class SurveyServiceTest {
         when(optionRepository.findByQuestionIdInAndAtivoTrue(List.of(10L)))
                 .thenReturn(List.of(option));
 
-        SurveyDetailsResponseDTO response = surveyService.getSurveyStructure(1L, false);
+        SurveyDetailsResponseDTO response = surveyService.getSurveyStructure(1L, false, false);
 
         assertThat(response.getQuestions()).hasSize(1);
         assertThat(response.getQuestions().get(0).getOptions()).hasSize(1);
@@ -179,20 +170,29 @@ class SurveyServiceTest {
     }
 
     @Test
-    @DisplayName("delete deve remover votos, opções e perguntas antes de apagar a pesquisa")
-    void delete_shouldCascadeChildEntities() {
-        when(surveyRepository.existsById(1L)).thenReturn(true);
+    @DisplayName("delete deve fazer soft delete em pesquisa, perguntas e opções")
+    void delete_shouldSoftDeleteCascade() {
+        Survey survey = buildSurvey(1L, "Pesquisa", true);
         Question question = new Question();
         question.setId(11L);
+        Option option = new Option();
+        option.setId(100L);
+        option.setQuestion(question);
+
+        when(surveyRepository.findById(1L)).thenReturn(Optional.of(survey));
         when(questionRepository.findBySurveyIdOrderByOrdemAsc(1L)).thenReturn(List.of(question));
+        when(optionRepository.findByQuestionIdIn(List.of(11L))).thenReturn(List.of(option));
+        when(optionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(questionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+        when(surveyRepository.save(any(Survey.class))).thenAnswer(inv -> inv.getArgument(0));
 
         surveyService.delete(1L);
 
-        verify(responseSessionRepository).deleteBySurveyId(1L);
-        verify(voteRepository).deleteBySurveyId(1L);
-        verify(optionRepository).deleteByQuestionIdIn(List.of(11L));
-        verify(questionRepository).deleteBySurveyId(1L);
-        verify(surveyRepository).deleteById(1L);
+        verify(optionRepository).saveAll(argThat(list -> StreamSupport.stream(list.spliterator(), false)
+                .allMatch(o -> o.getDeletedAt() != null && Boolean.FALSE.equals(o.getAtivo()))));
+        verify(questionRepository).saveAll(argThat(list -> StreamSupport.stream(list.spliterator(), false)
+                .allMatch(q -> q.getDeletedAt() != null)));
+        verify(surveyRepository).save(argThat(s -> s.getDeletedAt() != null && Boolean.FALSE.equals(s.getAtivo())));
     }
 
     private Survey buildSurvey(Long id, String titulo, boolean ativo) {

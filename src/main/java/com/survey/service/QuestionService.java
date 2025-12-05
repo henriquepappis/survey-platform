@@ -8,7 +8,6 @@ import com.survey.entity.Survey;
 import com.survey.exception.BusinessException;
 import com.survey.exception.ResourceNotFoundException;
 import com.survey.repository.QuestionRepository;
-import com.survey.repository.ResponseSessionRepository;
 import com.survey.repository.SurveyRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -23,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,25 +34,21 @@ public class QuestionService {
 
     private final QuestionRepository questionRepository;
     private final SurveyRepository surveyRepository;
-    private final ResponseSessionRepository responseSessionRepository;
     private final Counter questionCreatedCounter;
     private final Counter questionUpdatedCounter;
     private final Counter questionDeletedCounter;
 
     public QuestionService(QuestionRepository questionRepository,
-                           SurveyRepository surveyRepository,
-                           ResponseSessionRepository responseSessionRepository) {
-        this(questionRepository, surveyRepository, responseSessionRepository, Metrics.globalRegistry);
+                           SurveyRepository surveyRepository) {
+        this(questionRepository, surveyRepository, Metrics.globalRegistry);
     }
 
     @Autowired
     public QuestionService(QuestionRepository questionRepository,
                            SurveyRepository surveyRepository,
-                           ResponseSessionRepository responseSessionRepository,
                            MeterRegistry meterRegistry) {
         this.questionRepository = questionRepository;
         this.surveyRepository = surveyRepository;
-        this.responseSessionRepository = responseSessionRepository;
         this.questionCreatedCounter = meterRegistry.counter("question.operations", "type", "create");
         this.questionUpdatedCounter = meterRegistry.counter("question.operations", "type", "update");
         this.questionDeletedCounter = meterRegistry.counter("question.operations", "type", "delete");
@@ -169,13 +165,16 @@ public class QuestionService {
     }
 
     public void delete(Long id) {
-        if (!questionRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Pergunta não encontrada com id: " + id);
-        }
-        responseSessionRepository.deleteByQuestionId(id);
-        questionRepository.deleteById(id);
+        Question question = questionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pergunta não encontrada com id: " + id));
+
+        LocalDateTime now = LocalDateTime.now();
+        question.setDeletedAt(now);
+        questionRepository.save(question);
+
+        // Opcional: mantemos histórico de sessões/respostas; apenas removemos visualização via soft delete
         questionDeletedCounter.increment();
-        LOGGER.info("Question deleted {}", StructuredArguments.kv("questionId", id));
+        LOGGER.info("Question soft-deleted {}", StructuredArguments.kv("questionId", id));
     }
 
     private Question convertToEntity(QuestionRequestDTO dto, Survey survey) {

@@ -62,6 +62,7 @@ class FullFlowIntegrationTest {
         // Cria survey
         SurveyRequestDTO surveyRequest = new SurveyRequestDTO(
                 "Pesquisa Flow",
+                "Descricao",
                 true,
                 LocalDateTime.now().plusDays(10)
         );

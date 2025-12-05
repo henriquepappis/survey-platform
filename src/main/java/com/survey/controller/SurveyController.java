@@ -30,16 +30,21 @@ public class SurveyController {
     @GetMapping
     public ResponseEntity<PagedResponse<SurveyResponseDTO>> getAllSurveys(
             @RequestParam(required = false) Boolean ativo,
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "id") String sort,
             @RequestParam(defaultValue = "ASC") String direction) {
 
         Pageable pageable = buildPageable(page, size, sort, direction);
-        PagedResponse<SurveyResponseDTO> surveys =
-                (ativo != null && ativo)
-                        ? surveyService.findAllAtivas(pageable)
-                        : surveyService.findAll(pageable);
+        PagedResponse<SurveyResponseDTO> surveys;
+        if (includeDeleted) {
+            surveys = surveyService.findAllIncludingDeleted(pageable);
+        } else if (ativo != null && ativo) {
+            surveys = surveyService.findAllAtivas(pageable);
+        } else {
+            surveys = surveyService.findAll(pageable);
+        }
 
         return ResponseEntity.ok(surveys);
     }
@@ -53,8 +58,9 @@ public class SurveyController {
     @GetMapping("/{id}/structure")
     public ResponseEntity<SurveyDetailsResponseDTO> getSurveyStructure(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "false") boolean includeInactiveOptions) {
-        return ResponseEntity.ok(surveyService.getSurveyStructure(id, includeInactiveOptions));
+            @RequestParam(defaultValue = "false") boolean includeInactiveOptions,
+            @RequestParam(defaultValue = "false") boolean includeDeleted) {
+        return ResponseEntity.ok(surveyService.getSurveyStructure(id, includeInactiveOptions, includeDeleted));
     }
 
     @PostMapping
@@ -75,6 +81,11 @@ public class SurveyController {
             @Valid @RequestBody SurveyRequestDTO requestDTO) {
         SurveyResponseDTO updatedSurvey = surveyService.update(id, requestDTO);
         return ResponseEntity.ok(updatedSurvey);
+    }
+
+    @PatchMapping("/{id}/restore")
+    public ResponseEntity<SurveyResponseDTO> restoreSurvey(@PathVariable Long id) {
+        return ResponseEntity.ok(surveyService.restore(id));
     }
 
     @DeleteMapping("/{id}")

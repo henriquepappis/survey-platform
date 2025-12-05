@@ -1,0 +1,1 @@
+ALTER TABLE surveys ADD COLUMN descricao VARCHAR(1000) NULL AFTER titulo;
