@@ -80,15 +80,6 @@ public class VoteService {
 
         String safeIp = anonymizeIfNeeded(normalize(ipAddress));
         String safeUserAgent = normalize(userAgent);
-        if (duplicateWindowMinutes > 0) {
-            LocalDateTime windowStart = LocalDateTime.now().minusMinutes(duplicateWindowMinutes);
-            boolean existsRecent = voteRepository.existsBySurveyIdAndIpAddressAndUserAgentAndCreatedAtAfter(
-                    survey.getId(), safeIp, safeUserAgent, windowStart);
-            if (existsRecent) {
-                duplicateVoteBlockedCounter.increment();
-                throw new BusinessException("Já recebemos um voto recente deste dispositivo para esta pesquisa");
-            }
-        }
 
         Vote vote = new Vote();
         vote.setSurvey(survey);

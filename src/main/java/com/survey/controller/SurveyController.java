@@ -11,6 +11,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,10 +23,12 @@ import java.util.List;
 public class SurveyController {
 
     private final SurveyService surveyService;
+    private final com.survey.service.SurveyExportService surveyExportService;
 
     @Autowired
-    public SurveyController(SurveyService surveyService) {
+    public SurveyController(SurveyService surveyService, com.survey.service.SurveyExportService surveyExportService) {
         this.surveyService = surveyService;
+        this.surveyExportService = surveyExportService;
     }
 
     @GetMapping
@@ -67,6 +71,16 @@ public class SurveyController {
     public ResponseEntity<SurveyResponseDTO> createSurvey(@Valid @RequestBody SurveyRequestDTO requestDTO) {
         SurveyResponseDTO createdSurvey = surveyService.create(requestDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdSurvey);
+    }
+
+    @GetMapping("/{id}/export")
+    public ResponseEntity<byte[]> exportSurvey(@PathVariable Long id,
+                                               @RequestParam(defaultValue = "false") boolean includeDeleted) {
+        byte[] bytes = surveyExportService.exportSurveyAsXlsx(id, includeDeleted);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=survey-" + id + ".xlsx");
+        return ResponseEntity.ok().headers(headers).body(bytes);
     }
 
     @PostMapping("/batch")

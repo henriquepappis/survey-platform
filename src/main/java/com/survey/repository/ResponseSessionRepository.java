@@ -33,6 +33,8 @@ public interface ResponseSessionRepository extends JpaRepository<ResponseSession
 
     List<ResponseSession> findBySurveyIdAndCreatedAtBetween(Long surveyId, LocalDateTime start, LocalDateTime end);
 
+    List<ResponseSession> findBySurveyId(Long surveyId);
+
     void deleteBySurveyId(Long surveyId);
 
     void deleteByQuestionId(Long questionId);

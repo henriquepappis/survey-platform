@@ -32,7 +32,7 @@ public class DataInitializer implements CommandLineRunner {
                            OptionRepository optionRepository,
                            UserRepository userRepository,
                            PasswordEncoder passwordEncoder,
-                           @Value("${app.data.initialize:true}") boolean initializeData) {
+                           @Value("${app.data.initialize:false}") boolean initializeData) {
         this.surveyRepository = surveyRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
@@ -47,50 +47,6 @@ public class DataInitializer implements CommandLineRunner {
             return;
         }
 
-        if (surveyRepository.count() == 0) {
-            Survey survey = new Survey();
-            survey.setTitulo("Pesquisa de Satisfação");
-            survey.setDescricao("Pesquisa demo para validar a jornada completa no ambiente dev.");
-            survey.setAtivo(true);
-            survey.setDataValidade(LocalDateTime.now().plusMonths(1));
-            Survey savedSurvey = surveyRepository.save(survey);
-
-            Question question1 = createQuestion(savedSurvey, "Qual o seu nível de satisfação geral?", 1);
-            Question question2 = createQuestion(savedSurvey, "Você recomendaria nosso produto?", 2);
-
-            Question savedQuestion1 = questionRepository.save(question1);
-            Question savedQuestion2 = questionRepository.save(question2);
-
-            optionRepository.save(createOption(savedQuestion1, "Muito satisfeito", true));
-            optionRepository.save(createOption(savedQuestion1, "Satisfeito", true));
-            optionRepository.save(createOption(savedQuestion1, "Neutro", true));
-            optionRepository.save(createOption(savedQuestion1, "Insatisfeito", true));
-            optionRepository.save(createOption(savedQuestion2, "Sim", true));
-            optionRepository.save(createOption(savedQuestion2, "Não", true));
-        }
-
-        if (userRepository.count() == 0) {
-            UserAccount admin = new UserAccount();
-            admin.setUsername("admin");
-            admin.setPassword(passwordEncoder.encode("admin"));
-            admin.setRole("ADMIN");
-            userRepository.save(admin);
-        }
-    }
-
-    private Question createQuestion(Survey survey, String texto, int ordem) {
-        Question question = new Question();
-        question.setSurvey(survey);
-        question.setTexto(texto);
-        question.setOrdem(ordem);
-        return question;
-    }
-
-    private Option createOption(Question question, String texto, boolean ativo) {
-        Option option = new Option();
-        option.setQuestion(question);
-        option.setTexto(texto);
-        option.setAtivo(ativo);
-        return option;
+        // Seeds desativadas: manter apenas estrutura via migrations
     }
 }

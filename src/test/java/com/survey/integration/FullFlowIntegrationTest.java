@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-        "app.votes.duplicate-window-minutes=5"
+        "app.votes.duplicate-window-minutes=0"
 })
 class FullFlowIntegrationTest {
 

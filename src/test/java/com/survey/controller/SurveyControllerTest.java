@@ -46,7 +46,7 @@ class SurveyControllerTest {
         objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
 
-        SurveyController controller = new SurveyController(surveyService);
+        SurveyController controller = new SurveyController(surveyService, null);
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 

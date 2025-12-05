@@ -35,7 +35,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @org.springframework.test.context.TestPropertySource(properties = {
-        "app.votes.duplicate-window-minutes=5",
         "app.privacy.ip-anonymize=false"
 })
 class VoteIntegrationTest {
@@ -190,41 +189,6 @@ class VoteIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Opção não pertence à pergunta"));
-    }
-
-    @Test
-    @DisplayName("Voto duplicado dentro da janela deve retornar 400")
-    void registerVote_duplicateWithinWindow_shouldReturn400() throws Exception {
-        Survey survey = createSurvey(true, LocalDateTime.now().plusDays(2));
-        Question question = createQuestion(survey, "Pergunta 1", 1);
-        Option option = createOption(question, "Opção A", true);
-
-        VoteRequestDTO request = new VoteRequestDTO(
-                survey.getId(),
-                question.getId(),
-                option.getId()
-        );
-
-        mockMvc.perform(post("/api/votes")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(req -> {
-                            req.setRemoteAddr("198.51.100.10");
-                            req.addHeader("User-Agent", "JUnit/Test");
-                            return req;
-                        })
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/votes")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .with(req -> {
-                            req.setRemoteAddr("198.51.100.10");
-                            req.addHeader("User-Agent", "JUnit/Test");
-                            return req;
-                        })
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Já recebemos um voto recente deste dispositivo para esta pesquisa"));
     }
 
     private Survey createSurvey(boolean ativo, LocalDateTime validade) {
