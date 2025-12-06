@@ -43,3 +43,4 @@ Thumbs.db
 # Spring Boot
 application-local.properties
 .env
+.env.prod
