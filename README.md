@@ -149,6 +149,21 @@ Enquanto `app.data.initialize=true` e o banco estiver vazio, a aplicação popul
   - `FRONTEND_ORIGINS` (lista separada por vírgula)
   - `AUDIENCE_ENABLED` (true/false), `IP_ANONYMIZE` (true/false), `RETENTION_DAYS`
 
+## Deploy no Fly.io
+
+- Requisitos: `flyctl` instalado e autenticado (`flyctl auth login`).
+- Envie as secrets de produção (ex.: `cp .env.example .env.prod` e ajuste valores reais):
+  ```bash
+  flyctl secrets import < .env.prod
+  ```
+- Para build/deploy usando o Dockerfile do projeto com builder remoto:
+  ```bash
+  ./scripts/fly-deploy.sh
+  # ou
+  make fly-deploy ARGS="--strategy immediate"
+  ```
+- O script lê `app` e `primary_region` do `fly.toml`, gera um label da imagem com timestamp e aceita flags extras do `flyctl deploy` (ex.: `--build-arg`, `--vm-size`).
+
 ## Endpoints
 
 ### Health Check

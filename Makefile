@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: dev dev-h2 test docker-up docker-down docker-logs
+.PHONY: dev dev-h2 test docker-up docker-down docker-logs fly-deploy
 
 dev:
 	@mvn spring-boot:run
@@ -19,3 +19,6 @@ docker-down:
 
 docker-logs:
 	@docker compose logs -f
+
+fly-deploy:
+	@./scripts/fly-deploy.sh $(ARGS)
