@@ -94,7 +94,8 @@ class UserServiceTest {
     @Test
     @DisplayName("delete deve lançar erro quando usuário não existe")
     void delete_shouldFailWhenMissing() {
-        when(userRepository.existsById(10L)).thenReturn(false);
+        // UserService.delete usa findById (não existsById)
+        when(userRepository.findById(10L)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> userService.delete(10L));
     }
 

@@ -27,9 +27,8 @@ public class VoteService {
     private final OptionRepository optionRepository;
     private final VoteRepository voteRepository;
     private final ResponseSessionRepository responseSessionRepository;
+    private final ResponseSessionPrivacyService privacyService;
     private final long duplicateWindowMinutes;
-    private final boolean anonymizeIp;
-    private final boolean audienceEnabled;
     private final Counter duplicateVoteBlockedCounter;
 
     public VoteService(SurveyRepository surveyRepository,
@@ -37,18 +36,16 @@ public class VoteService {
                        OptionRepository optionRepository,
                        VoteRepository voteRepository,
                        ResponseSessionRepository responseSessionRepository,
+                       ResponseSessionPrivacyService privacyService,
                        @Value("${app.votes.duplicate-window-minutes:10}") long duplicateWindowMinutes,
-                       @Value("${app.privacy.ip-anonymize:true}") boolean anonymizeIp,
-                       @Value("${app.privacy.audience-enabled:true}") boolean audienceEnabled,
                        MeterRegistry meterRegistry) {
         this.surveyRepository = surveyRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
         this.voteRepository = voteRepository;
         this.responseSessionRepository = responseSessionRepository;
+        this.privacyService = privacyService;
         this.duplicateWindowMinutes = duplicateWindowMinutes;
-        this.anonymizeIp = anonymizeIp;
-        this.audienceEnabled = audienceEnabled;
         this.duplicateVoteBlockedCounter = meterRegistry.counter("vote.duplicate.blocked");
     }
 
@@ -78,17 +75,19 @@ public class VoteService {
             throw new BusinessException("Opção está inativa");
         }
 
-        String safeIp = anonymizeIfNeeded(normalize(ipAddress));
-        String safeUserAgent = normalize(userAgent);
+        // Aplica políticas de privacidade aos dados sensíveis
+        String anonymizedIp = privacyService.anonymizeIpAddress(ipAddress);
+        String normalizedUserAgent = privacyService.normalizeUserAgent(userAgent, 500);
 
         Vote vote = new Vote();
         vote.setSurvey(survey);
         vote.setQuestion(question);
         vote.setOption(option);
-        vote.setIpAddress(safeIp);
-        vote.setUserAgent(safeUserAgent);
-        ResponseSession session = audienceEnabled
-                ? buildSession(request, survey, question, ipAddress, userAgent)
+        vote.setIpAddress(anonymizedIp);
+        vote.setUserAgent(normalizedUserAgent);
+        
+        ResponseSession session = privacyService.isAudienceCollectionEnabled()
+                ? buildSession(request, survey, question, anonymizedIp, normalizedUserAgent)
                 : null;
         if (session != null) {
             responseSessionRepository.save(session);
@@ -177,33 +176,4 @@ public class VoteService {
         return "unknown";
     }
 
-    private String normalize(String value) {
-        if (value == null || value.isBlank()) {
-            return "unknown";
-        }
-        return value.trim();
-    }
-
-    private String anonymizeIfNeeded(String ip) {
-        if (!anonymizeIp) {
-            return ip;
-        }
-        if ("unknown".equals(ip)) {
-            return ip;
-        }
-        // Trunca último octeto (IPv4) ou último bloco (IPv6) para reduzir granularidade.
-        if (ip.contains(".")) {
-            String[] parts = ip.split("\\.");
-            if (parts.length == 4) {
-                parts[3] = "0";
-                return String.join(".", parts);
-            }
-        }
-        if (ip.contains(":")) {
-            String[] parts = ip.split(":");
-            parts[parts.length - 1] = "0000";
-            return String.join(":", parts);
-        }
-        return "unknown";
-    }
 }

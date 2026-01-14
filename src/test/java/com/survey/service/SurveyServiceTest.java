@@ -135,7 +135,8 @@ class SurveyServiceTest {
     @Test
     @DisplayName("delete deve lançar ResourceNotFound quando id não existe")
     void delete_whenSurveyMissing_shouldThrow() {
-        when(surveyRepository.existsById(7L)).thenReturn(false);
+        // SurveyService.delete usa findById (não existsById)
+        when(surveyRepository.findById(7L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> surveyService.delete(7L));
     }

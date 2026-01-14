@@ -131,7 +131,8 @@ class QuestionServiceTest {
     @Test
     @DisplayName("delete deve lançar quando pergunta não existe")
     void delete_whenMissing_shouldThrow() {
-        when(questionRepository.existsById(123L)).thenReturn(false);
+        // QuestionService.delete usa findById (não existsById)
+        when(questionRepository.findById(123L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> questionService.delete(123L));
     }

@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "app.votes.duplicate-window-minutes=0"
 })
-class FullFlowIntegrationTest {
+class FullFlowIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,7 +46,6 @@ class FullFlowIntegrationTest {
 
     @BeforeEach
     void resetData() {
-        userRepository.deleteAll();
         UserAccount admin = new UserAccount();
         admin.setUsername("admin");
         admin.setPassword(passwordEncoder.encode("admin123"));

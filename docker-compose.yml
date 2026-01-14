@@ -1,20 +1,29 @@
-version: "3.9"
-
 services:
   mysql:
     image: mysql:8.0
     container_name: survey-mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: survey_db
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_USER: survey
-      MYSQL_PASSWORD: survey
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-survey_db}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_USER: ${MYSQL_USER:-survey}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-survey}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-    command: ["--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    command: 
+      - "--default-authentication-plugin=mysql_native_password"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+      - "--max_connections=200"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - survey-network
 
   prometheus:
     image: prom/prometheus:v2.48.1
@@ -22,19 +31,91 @@ services:
     restart: unless-stopped
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - survey-network
 
   grafana:
     image: grafana/grafana:10.2.0
     container_name: survey-grafana
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_INSTALL_PLUGINS: ""
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - survey-network
+
+  survey-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: survey-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Banco
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-survey_db}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${MYSQL_USER:-survey}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-survey}
+      # JWT / segurança (defina um segredo forte em produção)
+      JWT_SECRET: ${JWT_SECRET:-change-me-dev-secret-please-keep-32chars-minimum-123456}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      # CORS
+      FRONTEND_ORIGINS: ${FRONTEND_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # Privacidade / audiência
+      AUDIENCE_ENABLED: ${AUDIENCE_ENABLED:-true}
+      IP_ANONYMIZE: ${IP_ANONYMIZE:-true}
+      IP_HASH_SALT: ${IP_HASH_SALT:-}
+      RETENTION_DAYS: ${RETENTION_DAYS:-90}
+      # Outras
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    networks:
+      - survey-network
 
 volumes:
   mysql_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  survey-network:
+    driver: bridge

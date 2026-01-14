@@ -136,7 +136,8 @@ class OptionServiceTest {
     @Test
     @DisplayName("delete deve validar existência antes de remover")
     void delete_whenMissing_shouldThrow() {
-        when(optionRepository.existsById(11L)).thenReturn(false);
+        // OptionService.delete usa findById (não existsById)
+        when(optionRepository.findById(11L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> optionService.delete(11L));
     }

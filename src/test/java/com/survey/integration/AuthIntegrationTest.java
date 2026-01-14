@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-class AuthIntegrationTest {
+class AuthIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -49,8 +49,6 @@ class AuthIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        userRepository.deleteAll();
-
         UserAccount admin = new UserAccount();
         admin.setUsername("admin");
         admin.setPassword(passwordEncoder.encode("admin123"));

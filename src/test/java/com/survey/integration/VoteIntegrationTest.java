@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @org.springframework.test.context.TestPropertySource(properties = {
         "app.privacy.ip-anonymize=false"
 })
-class VoteIntegrationTest {
+class VoteIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -59,14 +59,7 @@ class VoteIntegrationTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
-    @BeforeEach
-    void cleanDatabase() {
-        voteRepository.deleteAll();
-        responseSessionRepository.deleteAll();
-        optionRepository.deleteAll();
-        questionRepository.deleteAll();
-        surveyRepository.deleteAll();
-    }
+    // limpeza física fica no AbstractIntegrationTest (hardCleanDatabase)
 
     @Test
     @DisplayName("POST /api/votes deve persistir voto e sessão de resposta")
@@ -193,7 +186,8 @@ class VoteIntegrationTest {
 
     private Survey createSurvey(boolean ativo, LocalDateTime validade) {
         Survey survey = new Survey();
-        survey.setTitulo("Pesquisa Teste");
+        // Título precisa ser único (há índice UNIQUE no schema e soft delete em survey)
+        survey.setTitulo("Pesquisa Teste " + java.util.UUID.randomUUID());
         survey.setAtivo(ativo);
         survey.setDataValidade(validade);
         return surveyRepository.save(survey);

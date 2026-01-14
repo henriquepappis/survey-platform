@@ -39,20 +39,27 @@ class VoteServiceTest {
     private VoteRepository voteRepository;
     @Mock
     private ResponseSessionRepository responseSessionRepository;
+    @Mock
+    private ResponseSessionPrivacyService privacyService;
 
     private VoteService voteService;
 
     @BeforeEach
     void setUp() {
+        // Mock do privacy service para retornar valores sem anonimização nos testes.
+        // lenient() evita falhas por stubs não usados em cenários que lançam antes de chegar aqui.
+        lenient().when(privacyService.anonymizeIpAddress(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(privacyService.normalizeUserAgent(anyString(), anyInt())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(privacyService.isAudienceCollectionEnabled()).thenReturn(true);
+        
         voteService = new VoteService(
                 surveyRepository,
                 questionRepository,
                 optionRepository,
                 voteRepository,
                 responseSessionRepository,
+                privacyService,
                 0L, // janela desabilitada para testes unitários
-                true,
-                true,
                 new SimpleMeterRegistry()
         );
     }
